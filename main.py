@@ -104,7 +104,15 @@ class DistributedTransactionSimulator:
         
         # Start fault injector
         await self.fault_injector.start()
-        
+
+        # Start metrics collector
+        if self.metrics_collector:
+            await self.metrics_collector.start()
+
+        # Start transaction manager
+        if self.transaction_manager:
+            await self.transaction_manager.start()
+
         logger.info("Simulator berjalan dan siap memproses transaksi")
     
     async def stop(self):
@@ -113,9 +121,15 @@ class DistributedTransactionSimulator:
         logger.info("Menghentikan simulator...")
         
         # Stop semua komponen
+        if self.transaction_manager:
+            await self.transaction_manager.stop()
+
         if self.fault_injector:
             await self.fault_injector.stop()
-        
+
+        if self.metrics_collector:
+            await self.metrics_collector.stop()
+
         if self.node_manager:
             await self.node_manager.stop()
         
@@ -263,8 +277,8 @@ async def main():
         logger.info(f"\nStatistik Performa:\n{stats.to_string()}")
         
         # Tampilkan failure summary
-        failure_summary = simulator.fault_injector.get_failure_summary()
-        logger.info(f"\nRingkasan Gagal Sistem:\n{failure_summary}")
+        fault_summary = simulator.fault_injector.get_fault_summary()
+        logger.info(f"\nRingkasan Gagal Sistem:\n{fault_summary}")
         
         await asyncio.sleep(2)
         

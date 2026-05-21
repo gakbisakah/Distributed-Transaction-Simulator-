@@ -2,16 +2,12 @@
 # Python 3.9+ required
 
 # Core dependencies
-dataclasses>=0.6
 typing-extensions>=4.0.0
-enum>=0.4.7
 
 # Async and concurrent processing
-asyncio>=3.4.3
 aiofiles>=22.1.0
 
 # Logging and metrics
-logging>=0.5.1.2
 colorlog>=6.6.0
 
 # Testing

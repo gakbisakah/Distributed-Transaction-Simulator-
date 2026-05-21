@@ -69,7 +69,8 @@ class LockManager:
         self,
         owner: str,
         resource_key: str,
-        lock_type: LockType = LockType.WRITE
+        lock_type: LockType = LockType.WRITE,
+        timeout_ms: Optional[int] = None
     ) -> bool:
         """
         Acquire lock untuk resource
@@ -78,7 +79,8 @@ class LockManager:
             owner: Owner identifier (transaction ID)
             resource_key: Key resource yang akan dilock
             lock_type: Tipe lock (READ/WRITE)
-            
+            timeout_ms: Timeout untuk acquire lock
+
         Returns:
             True jika lock berhasil diacquire
         """
@@ -101,7 +103,7 @@ class LockManager:
             self._record_wait(owner, resource_key)
         
         # Try to acquire
-        acquired = await lock.acquire(owner)
+        acquired = await lock.acquire(owner, timeout_ms=timeout_ms)
         
         if acquired:
             # Record ownership

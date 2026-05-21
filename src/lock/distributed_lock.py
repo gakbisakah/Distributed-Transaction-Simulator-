@@ -55,37 +55,44 @@ class DistributedLock:
         Returns:
             True jika lock berhasil diacquire
         """
-        timeout = timeout_ms or self.config.lock_timeout_ms
-        lease = lease_duration_ms or self.config.lock_timeout_ms
+        timeout = timeout_ms if timeout_ms is not None else self.config.lock_timeout_ms
+        # Lease duration default lebih lama dari wait timeout agar tidak cepat expire
+        lease = lease_duration_ms or (self.config.lock_timeout_ms * 12)
         
         start_time = datetime.now()
         
-        async with self._lock:
-            while self.owner_id is not None and self._is_lease_valid():
-                # Lock sedang dipegang, cek timeout
+        while True:
+            async with self._lock:
+                if self.owner_id is None or not self._is_lease_valid():
+                    # Acquire lock
+                    self.owner_id = owner
+                    self.lease_expiry = datetime.now()
+                    self.lease_expiry = self.lease_expiry.replace(
+                        microsecond=0
+                    )  # Normalize
+
+                    # Add lease duration
+                    from datetime import timedelta
+                    self.lease_expiry += timedelta(milliseconds=lease)
+
+                    self.lock_holder = owner
+
+                    logger.debug(f"Lock acquired for {self.resource_key} by {owner}")
+                    return True
+
+                if self.owner_id == owner:
+                    # Re-entrant lock (opsional, tergantung kebutuhan)
+                    # Untuk simulator ini, kita perbolehkan owner yang sama re-acquire
+                    return True
+
+                # Cek timeout
                 elapsed = (datetime.now() - start_time).total_seconds() * 1000
                 if elapsed >= timeout:
                     logger.debug(f"Timeout acquiring lock for {self.resource_key}")
                     return False
-                
-                # Tunggu sebentar sebelum cek ulang
-                await asyncio.sleep(0.01)
-            
-            # Acquire lock
-            self.owner_id = owner
-            self.lease_expiry = datetime.now()
-            self.lease_expiry = self.lease_expiry.replace(
-                microsecond=0
-            )  # Normalize
-            
-            # Add lease duration
-            from datetime import timedelta
-            self.lease_expiry += timedelta(milliseconds=lease)
-            
-            self.lock_holder = owner
-            
-            logger.debug(f"Lock acquired for {self.resource_key} by {owner}")
-            return True
+
+            # Tunggu sebentar sebelum cek ulang (di luar lock agar bisa direlease)
+            await asyncio.sleep(0.05)
     
     async def release(self, owner: str) -> bool:
         """

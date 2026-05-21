@@ -2,19 +2,22 @@
 Transaction Coordinator - Koordinator untuk distributed transactions (2PC)
 """
 
+from __future__ import annotations
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
 
 from src.model.transaction import Transaction
 from src.config.system_config import SystemConfig
-from src.node.node_manager import NodeManager
-from src.fault.fault_injector import FaultInjector
 from src.metrics.metrics_collector import MetricsCollector
 from src.log.write_ahead_log import WriteAheadLog
 from src.util.id_generator import IdGenerator
+
+if TYPE_CHECKING:
+    from src.node.node_manager import NodeManager
+    from src.fault.fault_injector import FaultInjector
 
 logger = logging.getLogger(__name__)
 
@@ -258,7 +261,19 @@ class TransactionCoordinator:
         """
         # Simulasi network delay
         await asyncio.sleep(self.config.network_latency_ms / 1000)
-        
+
+        # Ambil data transaksi untuk simulasi delay jika ada
+        transaction_data = {}
+        async with self._lock:
+            if transaction_id in self.active_transactions:
+                transaction_data = self.active_transactions[transaction_id]['transaction'].data
+
+        # Simulasi processing delay jika dispesifikasikan di data transaksi
+        if 'delay' in transaction_data:
+            delay_ms = transaction_data['delay']
+            logger.debug(f"Simulating processing delay of {delay_ms}ms on node {node_id}")
+            await asyncio.sleep(delay_ms / 1000)
+
         # Cek apakah node masih aktif
         node = self.node_manager.get_node(node_id)
         if not node or not node.is_healthy:

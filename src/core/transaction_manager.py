@@ -2,20 +2,23 @@
 Transaction Manager - Mengelola siklus hidup transaksi
 """
 
+from __future__ import annotations
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from datetime import datetime
 from collections import defaultdict
 
 from src.model.transaction import Transaction
 from src.model.transaction_status import TransactionStatus
 from src.config.system_config import SystemConfig
-from src.core.transaction_coordinator import TransactionCoordinator
-from src.core.transaction_executor import TransactionExecutor
 from src.metrics.metrics_collector import MetricsCollector
 from src.util.id_generator import IdGenerator
 from src.util.timeout_manager import TimeoutManager
+
+if TYPE_CHECKING:
+    from src.core.transaction_coordinator import TransactionCoordinator
+    from src.core.transaction_executor import TransactionExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +62,15 @@ class TransactionManager:
     async def start(self):
         """Memulai transaction manager"""
         self.is_running = True
+        await self.timeout_manager.start()
         self.processor_task = asyncio.create_task(self._process_queue())
         logger.info("TransactionManager started")
     
     async def stop(self):
         """Menghentikan transaction manager"""
         self.is_running = False
-        
+        await self.timeout_manager.stop()
+
         if self.processor_task:
             self.processor_task.cancel()
             try:
@@ -153,7 +158,9 @@ class TransactionManager:
                 )
                 
                 # Proses transaksi
-                await self._process_transaction(transaction)
+                task = asyncio.create_task(self._process_transaction(transaction))
+                self.active_transactions[transaction.transaction_id] = task
+                await task
                 
                 # Tandai queue task selesai
                 self.pending_queue.task_done()
@@ -176,30 +183,42 @@ class TransactionManager:
         """
         start_time = datetime.now()
         transaction.status = TransactionStatus.PROCESSING
-        
+
+        if self.metrics:
+            self.metrics.record_transaction_start(transaction.transaction_id)
+
         try:
             # Coba eksekusi dengan coordinator
             result = await self.coordinator.execute_transaction(transaction)
             
+            if transaction.status == TransactionStatus.TIMEOUT:
+                # Jangan update status jika sudah timeout
+                return
+
             if result['success']:
                 transaction.status = TransactionStatus.COMMITTED
                 transaction.committed_at = datetime.now()
                 
                 if self.metrics:
-                    self.metrics.record_transaction_committed()
+                    self.metrics.record_transaction_committed(transaction.transaction_id)
             else:
                 transaction.status = TransactionStatus.FAILED
                 transaction.error_message = result.get('error', 'Unknown error')
                 
                 if self.metrics:
-                    self.metrics.record_transaction_failed()
+                    self.metrics.record_transaction_failed(transaction.transaction_id)
             
+        except asyncio.CancelledError:
+            if transaction.status != TransactionStatus.TIMEOUT:
+                transaction.status = TransactionStatus.TIMEOUT
+                transaction.error_message = "Transaction cancelled/timed out"
+            raise
         except Exception as e:
             transaction.status = TransactionStatus.FAILED
             transaction.error_message = str(e)
             
             if self.metrics:
-                self.metrics.record_transaction_failed()
+                self.metrics.record_transaction_failed(transaction.transaction_id)
             
             logger.error(f"Transaction {transaction.transaction_id} failed: {e}")
         
@@ -232,14 +251,18 @@ class TransactionManager:
         if transaction_id in self.transactions:
             transaction = self.transactions[transaction_id]
             
-            if transaction.status == TransactionStatus.PROCESSING:
+            if transaction.status in [TransactionStatus.PENDING, TransactionStatus.PROCESSING]:
                 transaction.status = TransactionStatus.TIMEOUT
                 transaction.error_message = "Transaction timeout"
-                
+
+                # Batalkan task jika sedang diproses
+                if transaction_id in self.active_transactions:
+                    self.active_transactions[transaction_id].cancel()
+
                 logger.warning(f"Transaction {transaction_id} timed out")
                 
                 if self.metrics:
-                    self.metrics.record_transaction_timeout()
+                    self.metrics.record_transaction_timeout(transaction_id)
     
     async def get_transaction_status(self, transaction_id: str) -> dict:
         """

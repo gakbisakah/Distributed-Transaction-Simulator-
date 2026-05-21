@@ -2,19 +2,22 @@
 Transaction Executor - Eksekutor untuk operasi transaksi di node lokal
 """
 
+from __future__ import annotations
 import asyncio
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from datetime import datetime
 
 from src.model.transaction import Transaction
 from src.model.transaction_status import TransactionStatus
 from src.config.system_config import SystemConfig
-from src.node.node_manager import NodeManager
 from src.fault.fault_injector import FaultInjector
 from src.metrics.metrics_collector import MetricsCollector
 from src.lock.lock_manager import LockManager
 from src.log.write_ahead_log import WriteAheadLog
+
+if TYPE_CHECKING:
+    from src.node.node_manager import NodeManager
 
 logger = logging.getLogger(__name__)
 

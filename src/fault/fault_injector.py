@@ -2,15 +2,18 @@
 Fault Injector - Injector untuk simulasi kegagalan sistem
 """
 
+from __future__ import annotations
 import asyncio
 import logging
 import random
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
 
 from src.config.system_config import SystemConfig
-from src.node.node_manager import NodeManager
+
+if TYPE_CHECKING:
+    from src.node.node_manager import NodeManager
 
 logger = logging.getLogger(__name__)
 

@@ -2,16 +2,19 @@
 Failure Detector - Mendeteksi kegagalan node dalam cluster
 """
 
+from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Dict, Optional, Set, List
+from typing import Dict, Optional, Set, List, TYPE_CHECKING
 from datetime import datetime
 from collections import defaultdict
 
 from src.config.system_config import SystemConfig
 from src.model.node_status import NodeStatus
-from src.node.node_manager import NodeManager
+
+if TYPE_CHECKING:
+    from src.node.node_manager import NodeManager
 
 logger = logging.getLogger(__name__)
 

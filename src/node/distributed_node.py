@@ -2,19 +2,22 @@
 Distributed Node - Representasi node dalam sistem terdistribusi
 """
 
+from __future__ import annotations
 import asyncio
 import logging
 import uuid
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
 
 from src.model.node_status import NodeStatus
 from src.config.system_config import SystemConfig
-from src.fault.failure_detector import FailureDetector
 from src.lock.lock_manager import LockManager
 from src.log.write_ahead_log import WriteAheadLog
 from src.core.transaction_executor import TransactionExecutor
+
+if TYPE_CHECKING:
+    from src.fault.failure_detector import FailureDetector
 
 logger = logging.getLogger(__name__)
 

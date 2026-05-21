@@ -2,15 +2,18 @@
 Recovery Manager - Mengelola recovery dari kegagalan sistem
 """
 
+from __future__ import annotations
 import asyncio
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, TYPE_CHECKING
 from datetime import datetime
 
 from src.config.system_config import SystemConfig
-from src.node.node_manager import NodeManager
 from src.model.node_status import NodeStatus
 from src.log.write_ahead_log import WriteAheadLog
+
+if TYPE_CHECKING:
+    from src.node.node_manager import NodeManager
 
 logger = logging.getLogger(__name__)
 

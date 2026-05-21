@@ -151,34 +151,23 @@ class TimeoutManager:
                 await asyncio.sleep(0.1)  # Check every 100ms
                 
                 current_time = time.time()
-                expired_keys = []
+                expired_entries = []
                 
                 with self._lock:
+                    keys_to_remove = []
                     for key, entry in self._timeouts.items():
                         if current_time >= entry.expiry_time:
-                            expired_keys.append(key)
+                            expired_entries.append(entry)
+                            keys_to_remove.append(key)
                     
                     # Remove expired entries
-                    for key in expired_keys:
+                    for key in keys_to_remove:
                         del self._timeouts[key]
                 
                 # Execute callbacks for expired timeouts
-                for key in expired_keys:
-                    # We need to re-get entry because we deleted it
-                    # In practice, we stored the entry info before deletion
-                    pass
-                
-                # Re-acquire with lock to get entry info
-                expired_entries = []
-                with self._lock:
-                    for key in expired_keys:
-                        # Entry sudah dihapus, kita perlu menyimpannya sebelum dihapus
-                        pass
-                
-                # Execute callbacks
-                for key in expired_keys:
-                    logger.debug(f"Timeout expired for {key}")
-                    # Call callback (should be handled differently in async context)
+                for entry in expired_entries:
+                    logger.debug(f"Timeout expired for {entry.key}")
+                    self._execute_callback(entry)
                     
             except asyncio.CancelledError:
                 break
